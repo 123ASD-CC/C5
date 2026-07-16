@@ -1,0 +1,95 @@
+project:
+  name: meeting_speech_system
+  meeting_id: ES2004a
+
+ali:
+  openai_base_url: ${ALI_OPENAI_BASE_URL}
+  dashscope_base_url: ${ALI_DASHSCOPE_BASE_URL}
+  api_host: ${ALI_API_HOST}
+
+models:
+  asr_model: "qwen3-asr-flash"
+  llm_model: "qwen-plus"
+  llm_strong_model: "qwen-max"
+  omni_model: "qwen3-omni-flash"
+  tts_model: "qwen-tts"
+
+paths:
+  raw_audio: data/raw/amicorpus/ES2004a/audio/ES2004a.Mix-Headset.wav
+  processed_audio: data/processed/ES2004a_16k_mono.wav
+  segments_json: data/segments/test_segments.json
+  asr_json: outputs/asr/asr_segments.json
+  bilingual_json: outputs/translation/bilingual_segments.json
+  subtitle_srt: outputs/subtitles/meeting_bilingual.srt
+  subtitle_vtt: outputs/subtitles/meeting_bilingual.vtt
+  summary_json: outputs/summary/summary.json
+  summary_md: outputs/summary/summary.md
+  tts_audio: outputs/tts/summary_zh.wav
+  omni_json: outputs/c4_omni/omni_results.json
+  eval_latency_json: outputs/eval/latency_report.json
+  eval_compare_json: outputs/eval/c3_vs_c4_compare.json
+
+preprocess:
+  sample_rate: 16000
+  channels: 1
+  segment_duration: 25.0
+  segment_starts: [120, 300, 480, 660, 840, 1020, 1200, 1380, 1560, 1740]
+  segment_prefix: ami_es2004a
+  scenario: meeting
+
+api:
+  max_data_url_mb: 10
+  timeout_seconds: 120
+  max_retries: 2
+  asr_input_mode: base64_data_url
+  omni_request_audio: true
+  tts_voice: Cherry
+  tts_format: wav
+
+streaming:
+  speaker_count: 4
+  min_utterance_duration: 1.2
+  merge_gap: 1.6
+  max_turn_duration: 18.0
+  vad_frame_ms: 30
+  vad_hop_ms: 10
+  annotation_zip: data/raw/ami_public_manual_1.6.2.zip
+  # Demo-only fallback. Keep false for a generalizable meeting system.
+  use_ami_annotations: false
+
+diarization:
+  # Recommended production backend:
+  # - ali_fun_asr_async: Alibaba Fun-ASR/Paraformer async file transcription with diarization_enabled.
+  # - pyannote: local/offline diarization with Hugging Face token and PyTorch.
+  # - local_energy: no extra model; only a weak fallback for demos.
+  backend: "ali_fun_asr_async"
+  model: "paraformer-v2"
+  speaker_count: 4
+  public_audio_url: "https://groups.inf.ed.ac.uk/ami/AMICorpusMirror//amicorpus/ES2004a/audio/ES2004a.Mix-Headset.wav"
+  task_json: outputs/web_cache/diarization_task.json
+  output_json: outputs/web_cache/diarization_result.json
+  wait_timeout_seconds: 30
+  local_backend: "3d-speaker-local"
+  local_vad_model: "fsmn-vad"
+  local_speaker_model: "iic/speech_campplus_sv_zh_en_16k-common_advanced"
+  local_subsegment_seconds: 1.5
+  local_subsegment_step_seconds: 0.75
+  # Long meetings use p-pruned spectral clustering; short recordings use
+  # calibrated AHC, matching the official 3D-Speaker recipe.
+  local_cluster_type: "spectral_with_ahc_short"
+  local_cluster_pval: 0.012
+  local_cluster_max_speakers: 15
+  local_cluster_cosine_threshold: 0.40
+  local_cluster_merge_cosine: 0.90
+  local_min_cluster_size: 4
+  postprocess_realtime_on_save: true
+
+online_diarization:
+  embedding_model: "iic/speech_campplus_sv_zh_en_16k-common_advanced"
+  match_threshold: 0.62
+  candidate_threshold: 0.62
+  immediate_new_threshold: 0.32
+  soft_match_threshold: 0.51
+  new_speaker_threshold: 0.45
+  strict_match_threshold: 0.65
+  confirm_windows: 2
